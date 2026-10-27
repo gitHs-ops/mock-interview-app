@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>실시간 회의록</title>
+  <meta name="description" content="모바일과 웹에서 회의 내용을 실시간으로 듣고 카카오톡 스타일의 화자별 메시지 버블로 작성 및 저장하는 회의록 작성 애플리케이션입니다.">
+  
+  <!-- Fonts: Google Fonts (Inter + Noto Sans KR for high quality rendering) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="pulse-dot idle" id="status-dot"></span>
+        <div class="title-container">
+          <input type="text" id="meeting-title" value="실시간 화상회의 기록" title="회의 제목 수정" placeholder="회의 제목 입력...">
+          <div class="header-lang-selector" style="display: flex; align-items: center; gap: 6px; margin-left: 8px;">
+            <i class="ph-bold ph-translate" style="font-size: 16px; color: var(--text-secondary);"></i>
+            <select id="recognition-lang" onchange="changeRecognitionLanguage()" style="font-size: 13px; font-weight: 500; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 24px 4px 8px; min-width: 140px; background-color: var(--bg-card); color: var(--text-primary); cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%237f8c8d%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>'); background-repeat: no-repeat; background-position: right 8px center;">
+              <option value="ko-KR">한국어 (ko-KR)</option>
+              <option value="en-US">English (en-US)</option>
+              <option value="ja-JP" selected>日本語 (ja-JP)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
+        <button class="header-icon-btn" id="interview-btn" onclick="startInterviewSimulation()" title="가상 면담 시작" style="width: auto; padding: 0 10px; border-radius: 17px; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;">
+          <span style="font-size: 12px;">가상면담</span>
+          <i class="ph-bold ph-user-focus"></i>
+        </button>
+        <button class="header-icon-btn active" id="translation-toggle-btn" onclick="toggleAutoTranslation()" title="실시간 한글 번역 켬" style="width: auto; padding: 0 10px; border-radius: 17px; display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600;">
+          <span style="font-size: 12px;">실시간 번역</span>
+          <i class="ph-bold ph-translate"></i>
+        </button>
+        <button class="header-icon-btn" id="camera-toggle-btn" onclick="toggleCamera()" title="카메라 모니터링">
+          <i class="ph-bold ph-video-camera-slash"></i>
+        </button>
+        <div class="timer-badge" id="meeting-timer">00:00</div>
+      </div>
+    </header>
+
+    <!-- Floating Camera Monitoring view -->
+    <div class="camera-monitor-wrapper" id="camera-wrapper">
+      <video id="camera-video" autoplay playsinline muted></video>
+      <div class="camera-status-tag">LIVE</div>
+    </div>
+
+    <!-- Main Live Transcription Chat Area -->
+    <main class="chat-container" id="chat-container">
+      <div class="chat-stream" id="chat-stream">
+        <!-- Welcoming Guide Bubble -->
+        <div class="system-notice">
+          <i class="ph-bold ph-info"></i>
+          <span>모바일의 마이크를 통해 실시간으로 발언을 기록합니다. 발언 도중 화자를 탭해 변경할 수 있습니다.</span>
+        </div>
+        
+        <!-- Interactive bubbles will be appended here -->
+      </div>
+      
+      <!-- Live Interim Result Preview (Realtime speaking floating card) -->
+      <div class="interim-preview-card" id="interim-preview-card">
+        <div class="preview-header">
+          <span class="speaker-tag" id="preview-speaker">화자 1</span>
+          <span class="preview-loading-dots">
+            <span></span><span></span><span></span>
+          </span>
+        </div>
+        <p class="preview-text" id="interim-text">마이크를 켜고 발언을 시작해 주세요...</p>
+      </div>
+    </main>
+
+    <!-- Interactive Bottom Deck -->
+    <section class="control-deck">
+      
+      <!-- Speaker Dock / Switcher -->
+      <div class="speaker-dock-wrapper">
+        <span class="dock-label">현재 발언자 선택</span>
+        <div class="speaker-scroll-container" id="speaker-container">
+          <button class="speaker-tab active" data-id="1" onclick="setActiveSpeaker(1)">
+            <span class="avatar avatar-1">1</span>
+            <span class="speaker-name">화자 1 🇯🇵</span>
+          </button>
+          <button class="speaker-tab" data-id="2" onclick="setActiveSpeaker(2)">
+            <span class="avatar avatar-2">2</span>
+            <span class="speaker-name">화자 2 🇺🇸</span>
+          </button>
+          <button class="speaker-tab" data-id="3" onclick="setActiveSpeaker(3)">
+            <span class="avatar avatar-3">3</span>
+            <span class="speaker-name">화자 3 🇰🇷</span>
+          </button>
+          <!-- Dynamic add speaker button -->
+          <button class="add-speaker-btn" onclick="addNewSpeaker()" title="화자 추가">
+            <i class="ph-bold ph-plus"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Controls Strip -->
+      <div class="controls-strip">
+        <!-- Left: Spacer to keep record button centered -->
+        <div class="action-left" style="width: 32%;"></div>
+
+        <!-- Center: Record Button (Main Action) -->
+        <div class="action-center">
+          <div style="display: flex; flex-direction: row; align-items: center; gap: 12px;">
+            <button class="btn btn-secondary" id="interview-stop-btn" onclick="confirmStopInterview()" style="display: none; height: 48px; min-width: 130px; border-radius: 24px; padding: 0 16px; font-weight: bold; background-color: #ff4757; border-color: #ff4757; color: white; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(255, 71, 87, 0.2); outline: none;">
+              <i class="ph-bold ph-x-circle" style="font-size: 18px;"></i> 면접 종료
+            </button>
+            <button class="record-btn" id="record-btn" onclick="toggleTranscription()">
+              <i class="ph-fill ph-microphone" id="mic-icon"></i>
+            </button>
+            <button class="btn btn-primary" id="interview-submit-btn" onclick="submitInterviewAnswer()" style="display: none; height: 48px; min-width: 130px; border-radius: 24px; padding: 0 16px; font-weight: bold; background-color: var(--speaker-2-avatar); border-color: var(--speaker-2-avatar); align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(46, 204, 113, 0.2);">
+              <i class="ph-bold ph-check-circle" style="font-size: 18px;"></i> 답변 끝
+            </button>
+          </div>
+          <span class="record-label" id="record-label">녹음 시작</span>
+        </div>
+
+        <!-- Right: Clear and Export Dropdown Actions -->
+        <div class="action-right">
+          <button class="btn btn-secondary" onclick="clearChatStream()" title="비우기">
+            <i class="ph-bold ph-trash-simple"></i> 비우기
+          </button>
+          <button class="btn btn-primary" onclick="openSaveModal()" title="저장하기">
+            <i class="ph-bold ph-download-simple"></i> 회의록 저장
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal Dialog: Save options -->
+    <div class="modal-overlay" id="save-modal" onclick="closeSaveModal()">
+      <div class="modal-card" onclick="event.stopPropagation()" style="max-width: 600px; width: 90%;">
+        <div class="modal-header">
+          <h3>회의록 미리보기 및 저장</h3>
+          <button class="close-btn" onclick="closeSaveModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="margin: 0; font-size: 14px; color: var(--text-secondary);">회의 대화 기록입니다. 형식을 변경하거나 아래 [저장]을 클릭해 파일로 다운로드 하실 수 있습니다.</p>
+          
+          <!-- Preview Mode Toggle Tabs -->
+          <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+            <button class="btn" id="btn-preview-chrono" onclick="switchPreviewMode('chrono')" style="flex: 1; font-weight: bold; border-radius: 6px; padding: 10px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s;">시간순 전체 기록</button>
+            <button class="btn" id="btn-preview-speaker" onclick="switchPreviewMode('speaker')" style="flex: 1; font-weight: bold; border-radius: 6px; padding: 10px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s;">화자별 묶음 기록</button>
+          </div>
+          
+          <!-- Transcript Preview Textarea -->
+          <textarea id="transcript-preview-area" readonly style="width: 100%; height: 320px; font-family: monospace; font-size: 13px; line-height: 1.6; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-app); color: var(--text-primary); resize: none; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);"></textarea>
+          
+          <!-- Save Button -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+            <button class="btn btn-secondary" onclick="closeSaveModal()" style="border-radius: 8px; padding: 8px 16px;">취소</button>
+            <button class="btn btn-primary" onclick="downloadCurrentTranscript()" style="border-radius: 8px; padding: 8px 24px; font-weight: bold; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(67, 97, 238, 0.25);">
+              <i class="ph-bold ph-download-simple"></i> 텍스트 파일로 저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

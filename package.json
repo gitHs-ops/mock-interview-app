@@ -1,0 +1,32 @@
+{
+  "name": "aura-transcribe",
+  "version": "1.0.0",
+  "description": "Aura Transcribe Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "app": "node launch.js"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.aura.transcribe",
+    "win": {
+      "target": "zip",
+      "icon": null
+    },
+    "files": [
+      "index.html",
+      "style.css",
+      "app.js",
+      "main.js",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
